@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今天中午吃什么 | 现代极简大轮盘</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 2.5rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+
+        p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+
+        /* 轮盘外框 */
+        .wheel-box {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 2rem;
+        }
+
+        /* 指针 */
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #ff4757;
+            z-index: 10;
+            filter: drop-shadow(0 2px 5px rgba(0,0,0,0.2));
+        }
+
+        /* 画布圆盘 */
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transition: transform 2s cubic-bezier(0.1, 0.8, 0.25, 1);
+        }
+
+        /* 抽奖按钮 */
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* 遮罩弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .modal-content h2 {
+            color: #764ba2;
+            font-size: 2rem;
+            margin: 1rem 0;
+        }
+
+        .modal-btn {
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🍱 今天中午吃什么</h1>
+        <p>纠结半天不如交给命运，转动吧轮盘！</p>
+        
+        <div class="wheel-box">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="300" height="300"></canvas>
+        </div>
+
+        <button class="btn" id="spinBtn" onclick="spinWheel()">开始抽奖</button>
+    </div>
+
+    <div class="modal" id="resultModal">
+        <div class="modal-content">
+            <p style="margin-bottom: 0.5rem;">🎯 决定了！今天中午就吃：</p>
+            <h2 id="resultText">螺蛳粉</h2>
+            <button class="modal-btn" onclick="closeModal()">好勒</button>
+        </div>
+    </div>
+
+    <script>
+        const foods = ['麻辣烫', '肯德基', '螺蛳粉', '沙县小吃', '汉堡', '鸡公煲'];
+        const colors = ['#ff9ff3', '#feca57', '#ff6b6b', '#48dbfb', '#1dd1a1', '#a55eea'];
+        
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const btn = document.getElementById('spinBtn');
+        
+        const numSegments = foods.length;
+        const segmentAngle = (2 * Math.PI) / numSegments;
+        let currentAngle = 0;
+
+        // 绘制轮盘
+        function drawWheel() {
+            ctx.clearRect(0, 0, 300, 300);
+            for (let i = 0; i < numSegments; i++) {
+                const angle = i * segmentAngle;
+                
+                // 画扇区
+                ctx.beginPath();
+                ctx.fillStyle = colors[i];
+                ctx.moveTo(150, 150);
+                ctx.arc(150, 150, 140, angle, angle + segmentAngle);
+                ctx.lineTo(150, 150);
+                ctx.fill();
+
+                // 写文字
+                ctx.save();
+                ctx.translate(150, 150);
+                ctx.rotate(angle + segmentAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText(foods[i], 130, 5);
+                ctx.restore();
+            }
+        }
+
+        // 初始化绘制
+        drawWheel();
+
+        // 旋转逻辑
+        function spinWheel() {
+            btn.disabled = true;
+            
+            // 随机旋转圈数和角度 (至少转4圈)
+            const randomDegrees = Math.floor(Math.random() * 360);
+            const totalRotation = 4 * 360 + randomDegrees;
+            
+            // 旋转动画
+            canvas.style.transform = `rotate(${totalRotation}deg)`;
+            
+            // 2秒后停止并计算结果
+            setTimeout(() => {
+                // 精准计算：由于画布初始状态是从0度（右侧）开始画，指针在正上方（270度位置）
+                // 我们需要算出最终旋转后，哪个扇区落在了正上方
+                const totalDeg = totalRotation % 360;
+                const pointerAngle = (270 - totalDeg + 360) % 360;
+                const segmentIndex = Math.floor(pointerAngle / (360 / numSegments));
+                
+                // 弹窗显示结果
+                document.getElementById('resultText').innerText = foods[segmentIndex];
+                document.getElementById('resultModal').style.display = 'flex';
+            }, 2000);
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').style.display = 'none';
+            canvas.style.transition = 'none';
+            canvas.style.transform = 'rotate(0deg)';
+            setTimeout(() => {
+                canvas.style.transition = 'transform 2s cubic-bezier(0.1, 0.8, 0.25, 1)';
+                btn.disabled = false;
+            }, 50);
+        }
+    </script>
+</body>
+</html>
