@@ -461,65 +461,87 @@
             setupEventListeners();
         }
 
+        function getAvailableIndices() {
+            return zodiacData
+                .map((_, index) => index)
+                .filter(index => !drawnZodiacs.includes(index));
+        }
+
+        function getSelectedIndexByRotation(rotationRad) {
+            const availableIndices = getAvailableIndices();
+            const remainingCount = availableIndices.length;
+            if (remainingCount === 0) return null;
+
+            const rotationDeg = ((rotationRad * 180 / Math.PI) % 360 + 360) % 360;
+            const sliceDeg = 360 / remainingCount;
+            const relativeAngle = (360 - rotationDeg) % 360;
+            const sectorIndex = Math.floor(relativeAngle / sliceDeg) % remainingCount;
+
+            return availableIndices[sectorIndex];
+        }
+
         // 绘制轮盘
         function drawWheel() {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             const radius = 180;
-            const sliceAngle = (2 * Math.PI) / 12;
+            const availableIndices = getAvailableIndices();
+            const remainingCount = availableIndices.length;
+            const sliceAngle = remainingCount > 0 ? (2 * Math.PI) / remainingCount : 0;
 
             // 清空画布
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 绘制12个扇形
-            zodiacData.forEach((zodiac, index) => {
-                const startAngle = index * sliceAngle - Math.PI / 2 + currentRotation;
-                const endAngle = startAngle + sliceAngle;
-
-                // 判断是否已被抽中
-                const isDrawn = drawnZodiacs.includes(index);
-                
-                // 绘制扇形
+            if (remainingCount === 0) {
                 ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-                ctx.closePath();
-
-                // 填充颜色
-                if (isDrawn) {
-                    ctx.fillStyle = '#E0E0E0';
-                    ctx.globalAlpha = 0.6;
-                } else {
-                    ctx.fillStyle = zodiac.color;
-                    ctx.globalAlpha = 1;
-                }
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#E0E0E0';
                 ctx.fill();
-
-                // 边框
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                ctx.globalAlpha = 1;
-
-                // 绘制文字
-                const textAngle = startAngle + sliceAngle / 2;
-                const textRadius = radius * 0.65;
-                const textX = centerX + Math.cos(textAngle) * textRadius;
-                const textY = centerY + Math.sin(textAngle) * textRadius;
-
-                ctx.save();
-                ctx.translate(textX, textY);
-                ctx.rotate(textAngle + Math.PI / 2);
-                ctx.fillStyle = isDrawn ? '#999' : 'white';
-                ctx.font = 'bold 18px Arial';
+                ctx.fillStyle = '#999';
+                ctx.font = 'bold 24px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(zodiac.emoji, 0, 0);
-                ctx.font = 'bold 14px Arial';
-                ctx.fillText(zodiac.name, 0, 28);
-                ctx.restore();
-            });
+                ctx.fillText('已抽完', centerX, centerY);
+            } else {
+                availableIndices.forEach((zodiacIndex, i) => {
+                    const zodiac = zodiacData[zodiacIndex];
+                    const startAngle = i * sliceAngle - Math.PI / 2 + currentRotation;
+                    const endAngle = startAngle + sliceAngle;
+
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                    ctx.closePath();
+
+                    ctx.fillStyle = zodiac.color;
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+
+                    const textAngle = startAngle + sliceAngle / 2;
+                    const textRadius = radius * 0.65;
+                    const textX = centerX + Math.cos(textAngle) * textRadius;
+                    const textY = centerY + Math.sin(textAngle) * textRadius;
+
+                    ctx.save();
+                    ctx.translate(textX, textY);
+                    ctx.rotate(textAngle + Math.PI / 2);
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 18px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(zodiac.emoji, 0, 0);
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(zodiac.name, 0, 28);
+                    ctx.restore();
+                });
+            }
 
             // 绘制中心圆
             ctx.beginPath();
@@ -544,29 +566,23 @@
             isSpinning = true;
             document.getElementById('spinBtn').disabled = true;
 
-            const remainingCount = 12 - drawnZodiacs.length;
-            const randomZodiacIndex = Math.floor(Math.random() * remainingCount);
-            
-            // 获取未被抽中的生肖
-            const availableIndices = [];
-            for (let i = 0; i < 12; i++) {
-                if (!drawnZodiacs.includes(i)) {
-                    availableIndices.push(i);
-                }
-            }
-            
-            const selectedIndex = availableIndices[randomZodiacIndex];
-            const targetAngle = (selectedIndex * (360 / 12)) + 180;
+            const availableIndices = getAvailableIndices();
+            const remainingCount = availableIndices.length;
+            const randomPosition = Math.floor(Math.random() * remainingCount);
+            const selectedIndex = availableIndices[randomPosition];
+            const sliceDeg = 360 / remainingCount;
+            const currentAngle = ((currentRotation * 180 / Math.PI) % 360 + 360) % 360;
+            const desiredRotation = (360 - randomPosition * sliceDeg) % 360;
+            const deltaAngle = ((desiredRotation - currentAngle + 540) % 360) - 180;
+            const rounds = 5 + Math.random() * 3;
+            const totalRotation = rounds * 360 + deltaAngle;
+            const finalRotation = currentAngle + totalRotation;
 
-            let currentAngle = (currentRotation * 180 / Math.PI) % 360;
-            let rounds = 5 + Math.random() * 3; // 转5-8圈
-            let totalRotation = rounds * 360 + (targetAngle - currentAngle);
-
-            animateSpin(0, totalRotation, selectedIndex);
+            animateSpin(currentAngle, finalRotation, selectedIndex);
         }
 
         // 旋转动画
-        function animateSpin(currentDegree, targetDegree, selectedIndex) {
+        function animateSpin(startDegree, endDegree, selectedIndex) {
             const duration = 3000; // 3秒
             const startTime = Date.now();
 
@@ -574,9 +590,8 @@
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
 
-                // 缓出动画（ease-out）
                 const easeProgress = 1 - Math.pow(1 - progress, 3);
-                const currentRotationDegree = currentDegree + (targetDegree - currentDegree) * easeProgress;
+                const currentRotationDegree = startDegree + (endDegree - startDegree) * easeProgress;
 
                 currentRotation = (currentRotationDegree * Math.PI / 180) % (2 * Math.PI);
                 drawWheel();
@@ -592,19 +607,12 @@
         }
 
         // 完成转动
-        function finishSpin(selectedIndex) {
-            // 添加到已抽中列表
-            drawnZodiacs.push(selectedIndex);
-
-            // 显示结果弹窗
-            showResult(selectedIndex);
-
-            // 更新记录和统计
+        function finishSpin(expectedIndex) {
+            const actualIndex = getSelectedIndexByRotation(currentRotation) ?? expectedIndex;
+            drawnZodiacs.push(actualIndex);
+            showResult(actualIndex);
             updateRecords();
-
-            // 重新绘制轮盘
             drawWheel();
-
             isSpinning = false;
             document.getElementById('spinBtn').disabled = drawnZodiacs.length === 12;
         }
